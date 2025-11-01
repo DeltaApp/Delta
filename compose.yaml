@@ -21,8 +21,8 @@ services:
     networks:
       - default
     # for debugging
-    ports:
-      - 100.80.20.80:27888:27017
+    # ports:
+    #  - 27888:27017
     volumes:
       - data:/data/db
       - config:/data/configdb

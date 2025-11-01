@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import { rateLimit, ipKeyGenerator } from "express-rate-limit";
 import { Status } from "../constants.js";
 import { NextFunction, Request, Response } from "express";
 import { getUserFromToken } from "./token.js";
@@ -25,7 +25,7 @@ export const makeRateLimiter = (allowedRequestsPerMinute: number) =>
       const user = (token && (await getUserFromToken(token))) || undefined;
       // if user is authenticated, set the identifier to the user id
       // if not then set it to the token or the ip address or unknown
-      return user ? user.id : req.ip || token;
+      return user ? user.id : req.ip ? ipKeyGenerator(req.ip) : token;
     },
   });
 

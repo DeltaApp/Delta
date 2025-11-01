@@ -121,8 +121,7 @@ messageCreateRouter.post(
     res.locals.json = await formatMessage(result);
 
     // emit mention event to mentioned users
-    // TODO: .filter((id) => id !== user.id)
-    const rooms = mentions.keys().toArray();
+    const rooms = mentions.keys().toArray().filter((id) => id !== user.id);
     if (rooms.length > 0) io.to(rooms).emit("mention", res.locals.json);
 
     io.to(result.channelId).emit("message", {

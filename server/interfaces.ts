@@ -1,3 +1,5 @@
+import type { JWTPayload } from "jose";
+
 // User & Member Interfaces
 export enum Roles {
   STAFF = 1 << 0, // user is a staff member
@@ -100,7 +102,7 @@ export interface IChannel {
 }
 
 // Define the TokenPayload interface
-export interface TokenPayload {
+export interface TokenPayload extends JWTPayload {
   userId: string;
   handle: string;
   password: string;
@@ -110,9 +112,11 @@ export interface TokenPayload {
 //! Websocket shit
 export enum WebSocketOP {
   HELLO = 0,
-  MESSAGE_CREATE = 1,
-  MESSAGE_UPDATE = 2,
-  MESSAGE_DELETE = 3,
+  JOIN = 1,
+  LEAVE = 2,
+  MESSAGE_CREATE = 3,
+  MESSAGE_UPDATE = 4,
+  MESSAGE_DELETE = 5,
 }
 
 export interface WebSocketEvent {

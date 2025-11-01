@@ -2,7 +2,7 @@ import { Document, Types } from "mongoose";
 import { env } from "../../constants.js";
 import { generateAuthToken } from "../../functions/token.js";
 import { generateSnowflakeID } from "../../functions/uid.js";
-import { IGuild, IUser } from "../../interfaces.js";
+import { IUser } from "../../interfaces.js";
 import { User } from "../schema/user.js";
 
 export const getUsers = async ({
@@ -22,7 +22,7 @@ export const getUsers = async ({
 };
 
 export const getUserById = async (
-  userId: string,
+  userId: string
 ): Promise<(IUser & Document<Types.ObjectId>) | null> => {
   const user = await User.findOne<IUser & Document<Types.ObjectId>>({
     id: userId,
@@ -35,7 +35,7 @@ export const getUserById = async (
 };
 
 export const getUserByToken = async (
-  token: string,
+  token: string
 ): Promise<(IUser & Document) | null> => {
   const user = await User.findOne({ token: token });
   if (!user) return null;
@@ -53,11 +53,16 @@ export const createUser = async (
     | "token"
     | "guilds"
     | "avatar"
-  >,
+  > & { hashedPassword: string }
 ): Promise<(IUser & Document) | null> => {
   try {
     const id = generateSnowflakeID("u");
-    const token = await generateAuthToken(id, data.handle, data.password);
+    const token = await generateAuthToken(
+      id,
+      data.handle,
+      data.password,
+      data.hashedPassword
+    );
 
     const user = new User<Omit<IUser, "guilds"> & { guilds: string[] }>({
       id,
@@ -67,7 +72,7 @@ export const createUser = async (
         parseInt(id.slice(1)) % 5
       }.png`,
       roles: 0,
-      password: data.password,
+      password: data.hashedPassword,
       disabled: false,
       deleted: false,
       bot: false,

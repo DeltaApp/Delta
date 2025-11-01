@@ -9,7 +9,7 @@ import loginRouter from "./routes/auth/login.js";
 import registerRouter from "./routes/auth/register.js";
 import { env, Status } from "./constants.js";
 import path from "path";
-import { WebSocketEvent, WebSocketOP } from "./interfaces.js";
+import { IUser, WebSocketEvent, WebSocketOP } from "./interfaces.js";
 import { makeRateLimiter } from "./functions/utility.js";
 import { getMessages } from "./database/functions/message.js";
 import { getChannels } from "./database/functions/channel.js";
@@ -144,90 +144,47 @@ io.on("connection", async (socket: Socket) => {
     return socket.disconnect(true);
   }
 
-  console.log(
-    `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m connected in WS \x1b[32m${socket.id}\x1b[0m`
-  );
-  socket.join(user.id);
+  await socketHELLO(socket, user);
 
   // Handle new websocket messages
   socket.on("message", async (message: WebSocketEvent) => {
+    console.log(message);
     switch (message.op) {
-      case WebSocketOP.HELLO: {
-        const id = user.id;
-
+      case WebSocketOP.JOIN: {
+        const rooms: string[] = message.d?.channels || [];
         console.log(
-          `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m (\x1b[32m${socket.id}\x1b[0m) sent \x1b[36mHELLO\x1b[0m`
+          `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m (\x1b[32m${socket.id}\x1b[0m) sent \x1b[36mJOIN\x1b[0m`
+        );
+        if (!rooms || !rooms.length || !Array.isArray(rooms)) return;
+
+        const RequestedChannels = rooms.filter((room) => room.startsWith("c"));
+
+        const possibleChannels = (await getChannels(RequestedChannels))?.filter(
+          (channel) => channel.members?.includes(user.id.toString())
         );
 
-        // get all unread messages
-        const unreadMessages = await getMessages(
-          {
-            readBy: { $nin: [id] },
-            channelId: {
-              $in: user.guilds
-                .map((g) =>
-                  g.channels
-                    .filter((c) => c.members.includes(id))
-                    .map((c) => c.id)
-                )
-                .flat(),
-            },
-          },
-          {
-            _id: 0,
-            channelId: 1,
-          }
-        );
-
-        // send a dummy to just fill in
-        if (!unreadMessages) {
-          socket.send({
-            op: WebSocketOP.HELLO,
-            d: { unreadMessages: 0 },
-          });
-          break;
-        }
-
-        const unreadMessagesObject = {} as Record<string, number>;
-
-        unreadMessages.map((unread) => {
-          // if the channel id is not in the object, add it
-          if (!unreadMessagesObject[unread.channelId]) {
-            unreadMessagesObject[unread.channelId] = 1;
-          }
-          // set a limit of 150 unreads per channel
-          if (unreadMessagesObject[unread.channelId] >= 150) return;
-          // inc the count
-          unreadMessagesObject[unread.channelId]++;
-        });
-
-        // send the object
+        await socket.join((possibleChannels || []).map((r) => r.id));
         socket.send({
-          op: WebSocketOP.HELLO,
-          d: { unreadMessages: unreadMessagesObject },
+          op: WebSocketOP.JOIN,
+          d: {
+            joined: (possibleChannels || []).map((r) => r.id),
+          },
         });
-
         break;
       }
+      case WebSocketOP.LEAVE: {
+        const rooms: string[] = message.d?.channels || [];
+        console.log(
+          `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m (\x1b[32m${socket.id}\x1b[0m) sent \x1b[36mLEAVE\x1b[0m`
+        );
+        if (!rooms || !rooms.length || !Array.isArray(rooms)) return;
+        rooms.map(async (room) => await socket.leave(room));
+        break;
+      }
+      default:
+        break;
     }
     return;
-  });
-
-  socket.on("join", async (rooms: string[]) => {
-    if (!rooms || !rooms.length || !Array.isArray(rooms)) return;
-
-    const RequestedChannels = rooms.filter((room) => room.startsWith("c"));
-
-    const possibleChannels = (await getChannels(RequestedChannels))?.filter(
-      (channel) => channel.members?.includes(user.id.toString())
-    );
-
-    return socket.join((possibleChannels || []).map((r) => r.id));
-  });
-
-  socket.on("leave", async (room: string) => {
-    if (!room) return;
-    return socket.leave(room);
   });
 
   // send first Heartbeat
@@ -255,3 +212,60 @@ io.on("connection", async (socket: Socket) => {
 });
 
 export default io;
+
+async function socketHELLO(socket: Socket, user: IUser) {
+  const id = user.id;
+
+  console.log(
+    `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m connected in WS \x1b[32m${socket.id}\x1b[0m`
+  );
+
+  // join user's own room for mentions & DMs
+  await socket.join(id);
+
+  // get all unread messages
+  const unreadMessages = await getMessages(
+    {
+      readBy: { $nin: [id] },
+      channelId: {
+        $in: user.guilds
+          .map((g) =>
+            g.channels.filter((c) => c.members.includes(id)).map((c) => c.id)
+          )
+          .flat(),
+      },
+    },
+    {
+      _id: 0,
+      channelId: 1,
+    }
+  );
+
+  // send a dummy to just fill in
+  if (!unreadMessages) {
+    socket.send({
+      op: WebSocketOP.HELLO,
+      d: { unreadMessages: 0 },
+    });
+    return;
+  }
+
+  const unreadMessagesObject = {} as Record<string, number>;
+
+  unreadMessages.map((unread) => {
+    // if the channel id is not in the object, add it
+    if (!unreadMessagesObject[unread.channelId]) {
+      unreadMessagesObject[unread.channelId] = 1;
+    }
+    // set a limit of 150 unreads per channel
+    if (unreadMessagesObject[unread.channelId] >= 150) return;
+    // inc the count
+    unreadMessagesObject[unread.channelId]++;
+  });
+
+  // send the object
+  socket.send({
+    op: WebSocketOP.HELLO,
+    d: { unreadMessages: unreadMessagesObject },
+  });
+}

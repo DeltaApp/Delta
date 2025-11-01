@@ -38,7 +38,8 @@ registerRouter.post("/", async (req, res): Promise<any> => {
       username: username,
       handle: handle,
       roles: 0,
-      password: hashedPassword,
+      password,
+      hashedPassword,
     });
 
     if (!user) return res.status(500).json({ message: Status[500] });

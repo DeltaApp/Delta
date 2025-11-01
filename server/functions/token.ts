@@ -1,36 +1,18 @@
-import jose from "node-jose";
+import * as jose from "jose";
 import { TokenPayload } from "../interfaces.js";
 import { getUserById } from "../database/functions/user.js";
 import { EPOCH } from "./uid.js";
-import { getKey } from "../database/functions/keys.js";
+import { compareSync } from "bcrypt";
 
-// Encrypts the payload using JWE
-const encryptPayload = async (payload: any): Promise<string> => {
-  // get the key
-  const key = await getKey();
-
-  const encrypted = await jose.JWE.createEncrypt({ format: "compact" }, key)
-    .update(JSON.stringify(payload))
-    .final();
-
-  return encrypted;
-};
-
-// Decrypts the JWE token and returns the payload
-const decryptToken = async (token: string): Promise<TokenPayload> => {
-  // Load the key into a key store
-  const key = await getKey();
-
-  const decrypted = await jose.JWE.createDecrypt(key).decrypt(token);
-
-  return JSON.parse(decrypted.plaintext.toString("utf8"));
-};
-
-// Generates a JWE token with the provided payload
+/**
+ * Generates a JWT with the provided payload
+ * @param password - the **RAW** password of the user
+ */
 export const generateAuthToken = async (
   userId: string,
   handle: string,
   password: string,
+  hashedPassword: string
 ): Promise<string> => {
   // one year in seconds = 60 * 60 * 24 * 365
   const expiry =
@@ -38,26 +20,27 @@ export const generateAuthToken = async (
   const payload: TokenPayload = {
     userId,
     handle,
-    password,
+    password: hashedPassword,
     exp: expiry,
   };
+  const rawPassword = new TextEncoder().encode(password);
 
-  const token = await encryptPayload(payload);
+  const token = await new jose.SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setIssuer("Delta")
+    .sign(rawPassword);
   return token;
 };
 
-// Retrieves the user from the JWE token
+// Retrieves the user from the JWT
 export const getUserFromToken = async (token: string) => {
   try {
-    const payload = await decryptToken(token);
+    const payload = (await jose.decodeJwt(token)) as TokenPayload;
     const user = await getUserById(payload.userId);
 
     if (!user) return null;
-    if (
-      payload.handle !== user.handle ||
-      payload.userId !== user.id ||
-      payload.password !== user.password
-    )
+    if (payload.handle !== user.handle || payload.userId !== user.id)
       return null;
 
     return user;
@@ -68,13 +51,20 @@ export const getUserFromToken = async (token: string) => {
 };
 
 export const AuthenticateToken = async (token: string) => {
-  const payload = await decryptToken(token);
-  const user = await getUserById(payload.userId);
-  if (!user) return false;
+  try {
+    const payload: TokenPayload = await jose.decodeJwt(token);
+    const user = await getUserById(payload.userId);
+    if (!user) return false;
 
-  if (payload.handle !== user.handle || payload.password !== user.password)
+    if (
+      payload.handle !== user.handle ||
+      compareSync(payload.password, user.password)
+    )
+      return false;
+    if (Math.floor(Date.now() / 1000) - Number(EPOCH) >= payload.exp)
+      return false;
+    return true;
+  } catch {
     return false;
-  if (Math.floor(Date.now() / 1000) - Number(EPOCH) >= payload.exp)
-    return false;
-  return true;
+  }
 };
