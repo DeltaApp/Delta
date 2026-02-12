@@ -9,7 +9,7 @@ import loginRouter from "./routes/auth/login.js";
 import registerRouter from "./routes/auth/register.js";
 import { env, Status } from "./constants.js";
 import path from "path";
-import { IUser, WebSocketEvent, WebSocketOP } from "./interfaces.js";
+import { ChannelPermissions, IUser, WebSocketEvent, WebSocketOP } from "./interfaces.js";
 import { makeRateLimiter } from "./functions/utility.js";
 import { getMessages } from "./database/functions/message.js";
 import { getChannels } from "./database/functions/channel.js";
@@ -160,7 +160,7 @@ io.on("connection", async (socket: Socket) => {
         const RequestedChannels = rooms.filter((room) => room.startsWith("c"));
 
         const possibleChannels = (await getChannels(RequestedChannels))?.filter(
-          (channel) => channel.members?.includes(user.id.toString())
+          (channel) => channel.members?.includes(user.id.toString()) || channel.permissions & ChannelPermissions.PUBLIC
         );
 
         await socket.join((possibleChannels || []).map((r) => r.id));

@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { IChannel } from "../../interfaces.js";
+import { ChannelPermissions, IChannel } from "../../interfaces.js";
 
 const ChannelsSchema = new mongoose.Schema<IChannel & mongoose.Document>({
   id: { type: String, required: true, unique: true },
@@ -11,6 +11,7 @@ const ChannelsSchema = new mongoose.Schema<IChannel & mongoose.Document>({
   },
   messages: { type: Number, required: true },
   members: { type: [String], required: true },
+  permissions: { type: Number, default: ChannelPermissions.PUBLIC }
 });
 
 export const Channel =

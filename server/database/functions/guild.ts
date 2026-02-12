@@ -1,6 +1,6 @@
 import { Document } from "mongoose";
 import { generateSnowflakeID } from "../../functions/uid.js";
-import { ChannelTypes, IChannel, IGuild } from "../../interfaces.js";
+import { ChannelPermissions, ChannelTypes, IChannel, IGuild } from "../../interfaces.js";
 import { Guild } from "../schema/guild.js";
 
 export const getGuildById = async (
@@ -49,6 +49,7 @@ export const createGuild = async (
           members: [data.ownerId],
           messages: 0,
           guildId: guildId,
+          permissions: ChannelPermissions.PUBLIC
         },
       ],
       deleted: false,

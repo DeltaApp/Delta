@@ -10,7 +10,7 @@ import {
 import { getChannelById } from "../../database/functions/channel.js";
 import messageCreateRouter from "./messages/create.js";
 import { formatMessage } from "../../functions/formatters.js";
-import { IMessage } from "../../interfaces.js";
+import { ChannelPermissions, IMessage } from "../../interfaces.js";
 import messageDeleteRouter from "./messages/delete.js";
 
 const messagesRouter = express.Router();
@@ -57,8 +57,9 @@ messagesRouter.get(
     if (
       !user ||
       !guild.members.includes(user.id) ||
-      !channel.members.includes(user.id)
-    ) {
+      (!channel.members.includes(user.id) &&
+        !(channel.permissions & ChannelPermissions.PUBLIC)
+      )) {
       res.locals.status = "401";
       return next();
     }

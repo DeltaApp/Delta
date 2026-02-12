@@ -1,7 +1,12 @@
 import express, { Response } from "express";
 import { makeRateLimiter, nextRouter } from "../../../functions/utility.js";
 import { createMessage } from "../../../database/functions/message.js";
-import { IMessage, WebSocketEvent, WebSocketOP } from "../../../interfaces.js";
+import {
+  ChannelPermissions,
+  IMessage,
+  WebSocketEvent,
+  WebSocketOP,
+} from "../../../interfaces.js";
 import { getUserFromToken } from "../../../functions/token.js";
 import io from "../../../server.js";
 import { getChannelById } from "../../../database/functions/channel.js";
@@ -12,7 +17,7 @@ const messageCreateRouter = express.Router();
 
 //TODO: dm messages
 /*
-	messageCreateRouter.post("/@me/:channelId", makeRateLimiter(8 * 60), x);
+  messageCreateRouter.post("/@me/:channelId", makeRateLimiter(8 * 60), x);
 */
 messageCreateRouter.post(
   "/:guildId/:channelId/messages",
@@ -51,9 +56,10 @@ messageCreateRouter.post(
       return next();
     }
 
-    const isInChannel = (
-      await getChannelById(req.params.channelId)
-    )?.members?.includes(user.id);
+    const channel = await getChannelById(req.params.channelId);
+    const isInChannel =
+      channel?.members?.includes(user.id) ||
+      (channel?.permissions ?? 0 & ChannelPermissions.PUBLIC);
 
     if (!isInChannel) {
       res.locals.status = "403";
@@ -121,7 +127,10 @@ messageCreateRouter.post(
     res.locals.json = await formatMessage(result);
 
     // emit mention event to mentioned users
-    const rooms = mentions.keys().toArray().filter((id) => id !== user.id);
+    const rooms = mentions
+      .keys()
+      .toArray()
+      .filter((id) => id !== user.id);
     if (rooms.length > 0) io.to(rooms).emit("mention", res.locals.json);
 
     io.to(result.channelId).emit("message", {

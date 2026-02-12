@@ -2,8 +2,9 @@ import { Document, Types } from "mongoose";
 import { env } from "../../constants.js";
 import { generateAuthToken } from "../../functions/token.js";
 import { generateSnowflakeID } from "../../functions/uid.js";
-import { IUser } from "../../interfaces.js";
+import { IGuild, IUser } from "../../interfaces.js";
 import { User } from "../schema/user.js";
+import { Guild } from "../schema/guild.js";
 
 export const getUsers = async ({
   ids,
@@ -56,6 +57,7 @@ export const createUser = async (
   > & { hashedPassword: string }
 ): Promise<(IUser & Document) | null> => {
   try {
+    const defaultGuildID = "67adde6604bd4e70d418a65a";
     const id = generateSnowflakeID("u");
     const token = await generateAuthToken(
       id,
@@ -68,9 +70,8 @@ export const createUser = async (
       id,
       username: data.username,
       handle: data.handle,
-      avatar: `https://${env.API_ORIGIN}/images/delta-${
-        parseInt(id.slice(1)) % 5
-      }.png`,
+      avatar: `https://${env.API_ORIGIN}/images/delta-${parseInt(id.slice(1)) % 5
+        }.png`,
       roles: 0,
       password: data.hashedPassword,
       disabled: false,
@@ -78,9 +79,19 @@ export const createUser = async (
       bot: false,
       system: false,
       token,
-      guilds: ["67adde6604bd4e70d418a65a"], //TODO: add the user to guild.$.member
+      guilds: [defaultGuildID]
     });
+    
     await user.save();
+    await Guild.findOneAndUpdate<IGuild>({ _id: defaultGuildID }, {
+      $push: {
+        members: user.id
+      },
+      $inc: {
+        memberCount: 1
+      }
+    });
+
     return user;
   } catch (err) {
     console.error(err);

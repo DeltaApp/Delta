@@ -31,8 +31,8 @@ messageDeleteRouter.delete(
 
     const { guildId, channelId, messageId } = req.params;
 
-    // check if user is the author of this message or has admin permissions or is staff
-    // getting the message
+    // check if user is the author of this message or has admin permissions 
+    // or is staff getting the message
     const message = await getMessageById({ guildId, channelId, messageId });
 
     if (!message) {

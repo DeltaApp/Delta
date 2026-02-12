@@ -23,6 +23,7 @@ export const createChannel = async (
       guildId: data.guildId,
       members: data.members,
       type: data.type,
+      permissions: data.permissions
     });
     await channel.save();
     return channel;

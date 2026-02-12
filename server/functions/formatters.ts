@@ -48,6 +48,7 @@ export async function formatChannel(channel: IChannel | (IChannel & Document)) {
       : null,
     messages: channel.messages,
     members: channel.members,
+    permissions: channel.permissions,
   };
 }
 
@@ -68,7 +69,6 @@ export async function formatMessage(message: IMessage | (IMessage & Document)) {
     author: {
       id: author.id,
       username: author.username,
-      handle: author.handle,
       avatar: author.avatar,
       roles: author.roles,
       disabled: author.disabled,
@@ -90,13 +90,13 @@ export function formatUser(
   const privateData = {
     password: "*".repeat(8),
     guilds: user.guilds,
+    handle: user.handle
   };
 
   return {
     ...(user.SHOW_PRIVATE_DATA ? privateData : {}),
     id: user.id,
     username: user.username,
-    handle: user.handle,
     avatar: user.avatar,
     roles: user.roles,
     disabled: user.disabled,

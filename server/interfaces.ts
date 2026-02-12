@@ -91,6 +91,10 @@ export enum ChannelTypes {
   VOICE = 2,
 }
 
+export enum ChannelPermissions {
+  PUBLIC = 1 << 0,
+}
+
 export interface IChannel {
   id: string;
   name: string;
@@ -99,6 +103,7 @@ export interface IChannel {
   guildId: string;
   members: string[];
   type: ChannelTypes;
+  permissions: number
 }
 
 // Define the TokenPayload interface
