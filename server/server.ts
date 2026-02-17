@@ -9,7 +9,12 @@ import loginRouter from "./routes/auth/login.js";
 import registerRouter from "./routes/auth/register.js";
 import { env, Status } from "./constants.js";
 import path from "path";
-import { ChannelPermissions, IUser, WebSocketEvent, WebSocketOP } from "./interfaces.js";
+import {
+  ChannelPermissions,
+  IUser,
+  WebSocketEvent,
+  WebSocketOP,
+} from "./interfaces.js";
 import { makeRateLimiter } from "./functions/utility.js";
 import { getMessages } from "./database/functions/message.js";
 import { getChannels } from "./database/functions/channel.js";
@@ -20,6 +25,9 @@ const app = express();
 
 app.all("/app", (_, res) => res.redirect("https://s.ily.cat/"));
 
+// .well-known for android assetlinks
+const well_known = express.static(path.resolve("./public/.well-known"));
+app.use("/.well-known", well_known);
 // stored images
 const images = express.static(path.resolve("./public/images"));
 app.use("/images", images);
@@ -52,7 +60,7 @@ app.use(
       // }
     },
     credentials: true,
-  })
+  }),
 );
 
 app.use(bodyParser.json({ limit: "25mb" }));
@@ -72,7 +80,7 @@ app.use("/auth/register", makeRateLimiter(10), registerRouter);
 const APIMiddleware = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<any> => {
   const [type, token] = req.header("Authorization")?.split(" ") || [];
   if ((type?.length || 0) >= 0 && type !== "Bearer") {
@@ -153,14 +161,16 @@ io.on("connection", async (socket: Socket) => {
       case WebSocketOP.JOIN: {
         const rooms: string[] = message.d?.channels || [];
         console.log(
-          `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m (\x1b[32m${socket.id}\x1b[0m) sent \x1b[36mJOIN\x1b[0m`
+          `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m (\x1b[32m${socket.id}\x1b[0m) sent \x1b[36mJOIN\x1b[0m`,
         );
         if (!rooms || !rooms.length || !Array.isArray(rooms)) return;
 
         const RequestedChannels = rooms.filter((room) => room.startsWith("c"));
 
         const possibleChannels = (await getChannels(RequestedChannels))?.filter(
-          (channel) => channel.members?.includes(user.id.toString()) || channel.permissions & ChannelPermissions.PUBLIC
+          (channel) =>
+            channel.members?.includes(user.id.toString()) ||
+            channel.permissions & ChannelPermissions.PUBLIC,
         );
 
         await socket.join((possibleChannels || []).map((r) => r.id));
@@ -175,7 +185,7 @@ io.on("connection", async (socket: Socket) => {
       case WebSocketOP.LEAVE: {
         const rooms: string[] = message.d?.channels || [];
         console.log(
-          `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m (\x1b[32m${socket.id}\x1b[0m) sent \x1b[36mLEAVE\x1b[0m`
+          `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m (\x1b[32m${socket.id}\x1b[0m) sent \x1b[36mLEAVE\x1b[0m`,
         );
         if (!rooms || !rooms.length || !Array.isArray(rooms)) return;
         rooms.map(async (room) => await socket.leave(room));
@@ -198,7 +208,7 @@ io.on("connection", async (socket: Socket) => {
   // Handle client disconnection
   socket.on("disconnect", () => {
     console.log(
-      `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m (\x1b[32m${socket.id}\x1b[0m) \x1b[31mDisconnected\x1b[0m`
+      `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m (\x1b[32m${socket.id}\x1b[0m) \x1b[31mDisconnected\x1b[0m`,
     );
     clearInterval(heartbeatInterval);
   });
@@ -217,7 +227,7 @@ async function socketHELLO(socket: Socket, user: IUser) {
   const id = user.id;
 
   console.log(
-    `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m connected in WS \x1b[32m${socket.id}\x1b[0m`
+    `\x1b[36m[Websocket] \x1b[35m${user.username} | ${user.id}\x1b[0m connected in WS \x1b[32m${socket.id}\x1b[0m`,
   );
 
   // join user's own room for mentions & DMs
@@ -230,7 +240,7 @@ async function socketHELLO(socket: Socket, user: IUser) {
       channelId: {
         $in: user.guilds
           .map((g) =>
-            g.channels.filter((c) => c.members.includes(id)).map((c) => c.id)
+            g.channels.filter((c) => c.members.includes(id)).map((c) => c.id),
           )
           .flat(),
       },
@@ -238,7 +248,7 @@ async function socketHELLO(socket: Socket, user: IUser) {
     {
       _id: 0,
       channelId: 1,
-    }
+    },
   );
 
   // send a dummy to just fill in
