@@ -25,9 +25,6 @@ const app = express();
 
 app.all("/app", (_, res) => res.redirect("https://s.ily.cat/"));
 
-// .well-known for android assetlinks
-const well_known = express.static(path.resolve("./public/.well-known"));
-app.use("/.well-known", well_known);
 // stored images
 const images = express.static(path.resolve("./public/images"));
 app.use("/images", images);

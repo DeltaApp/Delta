@@ -3,7 +3,7 @@ services:
     build:
       context: .
     env_file: ".env"
-    container_name: delta
+    container_name: delta-server
     environment:
       NODE_ENV: production
     networks:
@@ -40,6 +40,7 @@ volumes:
   config:
     driver: local
 
+# prometheus network for monitoring
 networks:
   prom:
     external: true
